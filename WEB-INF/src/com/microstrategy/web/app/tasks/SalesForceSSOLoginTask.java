@@ -138,7 +138,7 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 
 			// get the max-sessionstate
 			NodeList elems = (NodeList) element.getElementsByTagName("max-state");
-			String newSessionState = elems.item(0).getNodeValue();
+			String newSessionState = elems.item(0).getFirstChild().getNodeValue();
 
 			sessionInfo = new JSONObject();
 			sessionInfo.put("sessionState", newSessionState);
