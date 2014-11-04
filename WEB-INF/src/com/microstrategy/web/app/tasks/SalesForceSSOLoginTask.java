@@ -17,10 +17,12 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 import com.microstrategy.utils.StringUtils;
+import com.microstrategy.utils.cache.ResourceBundleCache;
 import com.microstrategy.web.app.tasks.architect.json.JSONException;
 import com.microstrategy.web.app.tasks.architect.json.JSONObject;
 import com.microstrategy.web.beans.MarkupOutput;
 import com.microstrategy.web.beans.RequestKeys;
+import com.microstrategy.web.platform.ContainerServices;
 import com.microstrategy.web.tasks.TaskException;
 import com.microstrategy.web.tasks.TaskParameterMetadata;
 import com.microstrategy.web.tasks.TaskRequestContext;
@@ -36,7 +38,6 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 	public static final String PARAM_NAME_USER_ID = "userId";
 	public static final String PARAM_NAME_NAMESPACE = "namespace";
 
-	private TaskParameterMetadata apiKeyParam = addParameterMetadata(PARAM_NAME_API_KEY, "The API Key.", true, null);
 	private TaskParameterMetadata loginUrlParam = addParameterMetadata(PARAM_NAME_LOGIN_URL, "The Salesforce login URL.", true, null);
 	private TaskParameterMetadata namespaceParam = addParameterMetadata(PARAM_NAME_NAMESPACE, "The mstrwid.", true, null);
 
@@ -49,27 +50,38 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 	@Override
 	public void processRequest(TaskRequestContext paramTaskRequestContext, MarkupOutput paramMarkupOutput) throws TaskException {
 		RequestKeys localRequestKeys = paramTaskRequestContext.getRequestKeys();
+
+		// Add missing required parameters
+		localRequestKeys.add(GetSessionStateTask.PARAM_NAME_SERVER, "DEFAULT");
+		localRequestKeys.add(GetSessionStateTask.PARAM_NAME_PROJECT, "DEFAULT");
+
 		checkForRequiredParameters(localRequestKeys);
 
-		// Validate the apiKey (Extract connection information from the properties file.
-		String apiKey = this.apiKeyParam.getValue(localRequestKeys);
+		// Validate the apiKey (Extract connection information from the
+		// properties file.
+		ContainerServices containerServices = paramTaskRequestContext.getContainerServices();
+		String apiKey = containerServices.getHeaderValue(PARAM_NAME_API_KEY);
 		String connectionInfo = APIKeys.getString(apiKey);
 		if (StringUtils.isEmpty(connectionInfo)) {
 			throw new TaskException("The application is not authorized to create sessions.");
 		}
-		
+
 		// Get Headers
-		String oauthToken = paramTaskRequestContext.getContainerServices().getHeaderValue(PARAM_NAME_OAUTH_TOKEN);
-		String organizationId = paramTaskRequestContext.getContainerServices().getHeaderValue(PARAM_NAME_ORGANIZATION_ID);
-		String userId = paramTaskRequestContext.getContainerServices().getHeaderValue(PARAM_NAME_USER_ID);	
+		String oauthToken = containerServices.getHeaderValue(PARAM_NAME_OAUTH_TOKEN);
+		String organizationId = containerServices.getHeaderValue(PARAM_NAME_ORGANIZATION_ID);
+		String userId = containerServices.getHeaderValue(PARAM_NAME_USER_ID);
+		String userName = containerServices.getHeaderValue(getSimpleSecurityLoginHeaderName());
 
 		// Get parameters
 		String loginUrl = this.loginUrlParam.getValue(localRequestKeys);
 		String namespace = this.namespaceParam.getValue(localRequestKeys);
 
 		// Extract SFDC userName with the oAuth Token
-		String userName = getSalesforceUserName(oauthToken, loginUrl, organizationId, userId);
-		if (StringUtils.isEmpty(userName)) {
+		String userNameFromSalesForce = getSalesforceUserName(oauthToken, loginUrl, organizationId, userId);
+		if (StringUtils.isEmpty(userNameFromSalesForce)) {
+			throw new TaskException("The oAuth token is not valid.");
+		}
+		if (!userNameFromSalesForce.equals(userName)){
 			throw new TaskException("The oAuth token is not valid.");
 		}
 
@@ -87,22 +99,23 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 				e.printStackTrace();
 			}
 		}
-		
-		// Add user header variable
-		paramTaskRequestContext.getContainerServices().setHeaderValue("SFDC_USER", userName);
+
+		// remove previously added required parameters
+		localRequestKeys.remove(GetSessionStateTask.PARAM_NAME_SERVER);
+		localRequestKeys.remove(GetSessionStateTask.PARAM_NAME_PROJECT);
 
 		// Add server, project, port and userName parameters
-		String[] connectionProps = connectionInfo.split("|"); 
+		String[] connectionProps = connectionInfo.split("[|]");
 		localRequestKeys.add(GetSessionStateTask.PARAM_NAME_SERVER, connectionProps[0]);
 		localRequestKeys.add(GetSessionStateTask.PARAM_NAME_PORT, connectionProps[1]);
 		localRequestKeys.add(GetSessionStateTask.PARAM_NAME_PROJECT, connectionProps[2]);
-		
+
 		// Add authMode
 		localRequestKeys.add(GetSessionStateTask.PARAM_NAME_AUTH_MODE, String.valueOf(EnumDSSXMLAuthModes.DssXmlAuthSimpleSecurityPlugIn));
 
-		
 		// Call the OOTB GetSessionStateTask
 		paramTaskRequestContext.setRequestKeys(localRequestKeys);
+
 		super.processRequest(paramTaskRequestContext, paramMarkupOutput);
 
 		// Add/update the resulting sessionState into the Session Manager
@@ -125,7 +138,7 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 
 			// get the max-sessionstate
 			NodeList elems = (NodeList) element.getElementsByTagName("max-state");
-			String newSessionState = elems.item(0).getTextContent();
+			String newSessionState = elems.item(0).getNodeValue();
 
 			sessionInfo = new JSONObject();
 			sessionInfo.put("sessionState", newSessionState);
@@ -152,7 +165,7 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 			InputStream response = gm.getResponseBodyAsStream();
 			String responseBody = IOUtils.toString(response, "UTF-8");
 			JSONObject json = new JSONObject(responseBody);
-			String userName =  json.getString("username");
+			String userName = json.getString("username");
 			if (StringUtils.isNotEmpty(userName)) {
 				return userName;
 			}
@@ -160,5 +173,10 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 			e.printStackTrace();
 		}
 		return null;
+	}
+
+	private String getSimpleSecurityLoginHeaderName() {
+		ResourceBundle localResourceBundle = ResourceBundleCache.getBundle("resources.custom_security");
+		return localResourceBundle.getString("LoginParam");
 	}
 }
