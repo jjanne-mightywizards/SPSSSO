@@ -84,6 +84,9 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 		if (!userNameFromSalesForce.equals(userName)){
 			throw new TaskException("The oAuth token is not valid.");
 		}
+		
+		// Execute Session Cleanup process asynchronously
+		cleanupSessions();
 
 		// Check if there is an existing session for the oAuth token
 		SalesForceSSOSessionManager sessionManager = SalesForceSSOSessionManager.getInstance();
@@ -142,7 +145,7 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 
 			sessionInfo = new JSONObject();
 			sessionInfo.put("sessionState", newSessionState);
-			String timeStamp = String.valueOf((new Date()).getTime());
+			Date timeStamp = new Date();
 			sessionInfo.put("timeStamp", timeStamp);
 
 			sessionList = sessionManager.getSessionList();
@@ -178,5 +181,13 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 	private String getSimpleSecurityLoginHeaderName() {
 		ResourceBundle localResourceBundle = ResourceBundleCache.getBundle("resources.custom_security");
 		return localResourceBundle.getString("LoginParam");
+	}
+	
+	private void cleanupSessions(){
+		new Thread(new Runnable() {
+		    public void run() {
+		        SalesForceSSOSessionManager.getInstance().executeCleanUp();
+		    }
+		}).start();
 	}
 }
