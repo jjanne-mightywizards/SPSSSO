@@ -28,7 +28,10 @@ import com.microstrategy.web.tasks.TaskParameterMetadata;
 import com.microstrategy.web.tasks.TaskRequestContext;
 import com.microstrategy.webapi.EnumDSSXMLAuthModes;
 
-public class SalesForceSSOLoginTask extends GetSessionStateTask {
+/**
+ * Task used to integrate With a SFCD Canvas Application
+ */
+public class SPSSSOLoginTask extends GetSessionStateTask {
 
 	// SalesForceSSO Params
 	public static final String PARAM_NAME_API_KEY = "apiKey";
@@ -43,15 +46,21 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 
 	public static final ResourceBundle APIKeys = ResourceBundle.getBundle("APIKeys");
 
-	public SalesForceSSOLoginTask() {
+	/**
+	 * Constructor
+	 */
+	public SPSSSOLoginTask() {
 		super();
 	}
 
+	/**
+	 * Overrides the processRequest from GetSessionStateTask
+	 */
 	@Override
 	public void processRequest(TaskRequestContext paramTaskRequestContext, MarkupOutput paramMarkupOutput) throws TaskException {
 		RequestKeys localRequestKeys = paramTaskRequestContext.getRequestKeys();
 
-		// Add missing required parameters
+		// Add missing required parameters fo the getSessionState task
 		localRequestKeys.add(GetSessionStateTask.PARAM_NAME_SERVER, "DEFAULT");
 		localRequestKeys.add(GetSessionStateTask.PARAM_NAME_PROJECT, "DEFAULT");
 
@@ -89,7 +98,7 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 		cleanupSessions();
 
 		// Check if there is an existing session for the oAuth token
-		SalesForceSSOSessionManager sessionManager = SalesForceSSOSessionManager.getInstance();
+		SPSSSOSessionManager sessionManager = SPSSSOSessionManager.getInstance();
 		HashMap<String, JSONObject> sessionList = sessionManager.getSessionList();
 
 		JSONObject sessionInfo = sessionList.get(namespace + ":" + oauthToken);
@@ -157,6 +166,14 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 		}
 	}
 
+	/**
+	 * Calls the SFDC login API to get the user information with oAuth
+	 * @param oauthToken
+	 * @param loginUrl
+	 * @param organizationId
+	 * @param userId
+	 * @return
+	 */
 	public String getSalesforceUserName(String oauthToken, String loginUrl, String organizationId, String userId) {
 		HttpClient httpclient = new HttpClient();
 		GetMethod gm = new GetMethod(loginUrl + "/id/" + organizationId + "/" + userId);
@@ -178,15 +195,22 @@ public class SalesForceSSOLoginTask extends GetSessionStateTask {
 		return null;
 	}
 
+	/**
+	 * Extracts the name of the header variable that contains the user name
+	 * @return
+	 */
 	private String getSimpleSecurityLoginHeaderName() {
 		ResourceBundle localResourceBundle = ResourceBundleCache.getBundle("resources.custom_security");
 		return localResourceBundle.getString("LoginParam");
 	}
 	
+	/**
+	 * Calls the session clean up process in a separate thread
+	 */
 	private void cleanupSessions(){
 		new Thread(new Runnable() {
 		    public void run() {
-		        SalesForceSSOSessionManager.getInstance().executeCleanUp();
+		        SPSSSOSessionManager.getInstance().executeCleanUp();
 		    }
 		}).start();
 	}

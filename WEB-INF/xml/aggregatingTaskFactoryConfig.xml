@@ -1,6 +1,6 @@
 <!DOCTYPE aggregatingTaskFactory SYSTEM "dtds/aggregatingTaskFactory.dtd">
 <aggregatingTaskFactory>
   <tasks>
-    <task registerAs="getSFDCSessionState" class="com.microstrategy.web.app.tasks.SalesForceSSOLoginTask"/>
+    <task registerAs="getSPSSessionState" class="com.microstrategy.web.app.tasks.SPSSSOLoginTask"/>
   </tasks>
 </aggregatingTaskFactory>

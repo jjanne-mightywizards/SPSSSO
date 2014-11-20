@@ -12,34 +12,55 @@ import org.joda.time.Days;
 import com.microstrategy.web.app.tasks.architect.json.JSONException;
 import com.microstrategy.web.app.tasks.architect.json.JSONObject;
 
-public class SalesForceSSOSessionManager {
+/**
+ * Handles session reuse and maintenance
+ */
+public class SPSSSOSessionManager {
 
-	private static SalesForceSSOSessionManager _instance = null;
+	private static SPSSSOSessionManager _instance = null;
 	private HashMap<String, JSONObject> _sessionList;
 	private Date _lastCleanupDate;
 	private boolean _cleanupInProgress;
 
-	private SalesForceSSOSessionManager() {
+	/**
+	 * Constructor
+	 */
+	private SPSSSOSessionManager() {
 		_sessionList = new HashMap<String, JSONObject>();
 		_lastCleanupDate = new Date();
 		_cleanupInProgress = false;
 	}
 
-	public static SalesForceSSOSessionManager getInstance() {
+	/**
+	 * Gets the singleton instance
+	 * @return
+	 */
+	public static SPSSSOSessionManager getInstance() {
 		if (_instance == null) {
-			_instance = new SalesForceSSOSessionManager();
+			_instance = new SPSSSOSessionManager();
 		}
 		return _instance;
 	}
 
+	/**
+	 * Gets the session list
+	 * @return
+	 */
 	public HashMap<String, JSONObject> getSessionList() {
 		return _sessionList;
 	}
 
+	/**
+	 * Sets the session list
+	 * @param sessionList
+	 */
 	public void setSessionList(HashMap<String, JSONObject> sessionList) {
 		_sessionList = sessionList;
 	}
 
+	/**
+	 * Executes the clean up process
+	 */
 	public void executeCleanUp() {
 		if(_cleanupInProgress){
 			return;
@@ -58,6 +79,11 @@ public class SalesForceSSOSessionManager {
 		_cleanupInProgress = false;
 	}
 
+	/**
+	 * Removes all sessions stored for longer than 1 day
+	 * @param currentDate
+	 * @throws JSONException
+	 */
 	public void cleanupSessions(Date currentDate) throws JSONException {
 		Iterator<Entry<String, JSONObject>> it = _sessionList.entrySet().iterator();
 		while (it.hasNext()) {
